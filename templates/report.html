@@ -1,0 +1,92 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>{{title}} ({{start}}~{{end}})</title>
+<style>
+@page{size:A4;margin:16mm 15mm}
+body{font-family:"Malgun Gothic","맑은 고딕","Noto Sans CJK KR","Noto Sans KR",sans-serif;font-size:10pt;color:#222;line-height:1.5;margin:0;background:#e9ecf1}
+.paper{background:#fff;max-width:210mm;margin:16px auto;padding:16mm 15mm;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.bar{position:sticky;top:0;background:#1d3256;padding:10px;text-align:center;z-index:9}
+.bar button,.bar a{background:#fff;color:#1d3256;border:0;border-radius:5px;padding:8px 16px;margin:0 4px;font-weight:700;cursor:pointer;font-size:14px;text-decoration:none;font-family:inherit}
+.bar small{color:#cfd8e8;display:block;margin-top:6px}
+@media print{body{background:#fff}.bar{display:none}.paper{box-shadow:none;margin:0;padding:0;max-width:none}}
+h1{text-align:center;font-size:18pt;margin:0 0 3mm;letter-spacing:1px}.sub{text-align:center;color:#555;margin-bottom:6mm}
+h2{font-size:11.5pt;border-left:4px solid #2c4a7c;padding-left:7px;margin:6mm 0 2.5mm;color:#1d3256;break-after:avoid}
+table{width:100%;border-collapse:collapse;font-size:9pt;margin:1.5mm 0;break-inside:auto}tr{break-inside:avoid}
+th,td{border:1px solid #9aa5b5;padding:3px 5px;text-align:center}th{background:#e8edf5}
+tr.total td{background:#f4f6fa;font-weight:700}.meta th{width:20%}.meta td,td.l{text-align:left}
+.cards{display:flex;gap:2.5mm}.card{flex:1;border:1px solid #c6cfdc;border-radius:4px;padding:2.5mm;text-align:center}
+.card .n{font-size:15pt;font-weight:700;color:#2c4a7c}.card .l{font-size:8.5pt;color:#555}
+.note{font-size:8pt;color:#666;margin:1mm 0}ul{margin:1mm 0;padding-left:5mm}li{margin-bottom:1.2mm}
+.sign{margin-top:9mm;text-align:right}svg text{font-family:inherit}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">🖨️ 인쇄 / PDF로 저장</button><a href="/">← 돌아가기</a>
+<small>PDF로 저장: 인쇄 창의 '대상(프린터)'에서 'PDF로 저장' 선택 · '머리글과 바닥글' 체크 해제 권장</small></div>
+<div class="paper">
+<h1>{{title}}</h1>
+<div class="sub">{{start}} ~ {{end}}</div>
+
+<h2>1. 개요</h2>
+<table class="meta">
+<tr><th>보고 기간</th><td>{{start}} ~ {{end}} ({{s.summary.period_days}}일 중 자료 {{s.summary.n}}일)</td></tr>
+<tr><th>대상</th><td>생활관 입사생 총원 {{s.summary.latest_total}}명 (종료일 기준)</td></tr>
+<tr><th>보고 내용</th><td>재사 인원 추이, 학년별 현황, 귀가·외박 사유 누계, 심야자습 현황, 특이사항</td></tr>
+</table>
+
+<h2>2. 기간 요약</h2>
+<div class="cards">
+ <div class="card"><div class="n">{{s.summary.avg_current}}명</div><div class="l">일평균 현인원</div></div>
+ <div class="card"><div class="n">{{s.summary.avg_rate}}%</div><div class="l">평균 재사율</div></div>
+ <div class="card"><div class="n">{{s.summary.sum_home}}명</div><div class="l">귀가 누계 (일평균 {{s.summary.avg_home}})</div></div>
+ <div class="card"><div class="n">{{s.summary.sum_out}}명</div><div class="l">외박 누계 (일평균 {{s.summary.avg_out}})</div></div>
+</div>
+<p class="note">※ 누계는 일자별 인원을 합산한 연인원입니다. 재사율 = 현인원 ÷ 총원.</p>
+
+<h2>3. 일자별 현황</h2>
+{% if s.chart %}
+<svg viewBox="0 0 {{s.chart.W}} {{s.chart.H}}" width="100%" style="max-height:62mm">
+ <polyline points="{{s.chart.poly}}" fill="none" stroke="#2c4a7c" stroke-width="2"/>
+ {% for p in s.chart.pts %}<circle cx="{{p.x}}" cy="{{p.y}}" r="3" fill="#2c4a7c"/>
+ {% if loop.index0 % s.chart.show_every == 0 or loop.last %}<text x="{{p.x}}" y="{{p.y-7}}" font-size="9" text-anchor="middle" fill="#1d3256">{{p.v}}</text>
+ <text x="{{p.x}}" y="{{s.chart.H-8}}" font-size="9" text-anchor="middle" fill="#666">{{p.label}}</text>{% endif %}{% endfor %}
+</svg>
+<p class="note" style="text-align:center">▲ 일자별 현인원 추이</p>
+{% endif %}
+<table>
+<tr><th>일자</th><th>총원</th><th>현인원</th><th>귀가</th><th>외박</th><th>재사율</th><th>심야자습</th></tr>
+{% for d in s.days %}<tr><td>{{d.date}}</td><td>{{d.total}}</td><td>{{d.current}}</td><td>{{d.home}}</td><td>{{d.out}}</td><td>{{d.rate}}%</td><td>{{d.night if d.night is not none else '-'}}</td></tr>{% endfor %}
+<tr class="total"><td>평균</td><td>-</td><td>{{s.summary.avg_current}}</td><td>{{s.summary.avg_home}}</td><td>{{s.summary.avg_out}}</td><td>{{s.summary.avg_rate}}%</td><td>{{s.night.avg if s.night else '-'}}</td></tr>
+</table>
+
+{% if s.grades %}
+<h2>4. 학년별 현황</h2>
+<table>
+<tr><th>학년</th><th>총원</th><th>평균 현인원</th><th>평균 재사율</th><th>귀가 누계</th><th>외박 누계</th><th>최저 재사율(일자)</th></tr>
+{% for g in s.grades %}<tr><td>{{g.grade}}</td><td>{{g.total}}</td><td>{{g.avg_current}}</td><td>{{g.avg_rate}}%</td><td>{{g.sum_home}}</td><td>{{g.sum_out}}</td><td>{{g.low_rate}}% ({{g.low_date[5:]}})</td></tr>{% endfor %}
+</table>
+{% endif %}
+
+<h2>5. 귀가·외박 사유별 누계</h2>
+<table>
+<tr><th>구분</th><th>사유</th><th>1학년</th><th>2학년</th><th>3학년</th><th>계</th><th>비율</th></tr>
+{% for r in s.reasons %}<tr><td>{{r.kind}}</td><td>{{r.reason}}</td><td>{{r['1학년'] or '-'}}</td><td>{{r['2학년'] or '-'}}</td><td>{{r['3학년'] or '-'}}</td><td><b>{{r.sum}}</b></td><td>{{r.share}}%</td></tr>{% endfor %}
+</table>
+
+<h2>6. 시험기간 심야자습 현황</h2>
+{% if s.night %}
+<table>
+<tr><th>학년</th><th>일평균 참여</th><th>참여 누계</th><th>남</th><th>여</th><th>현인원 대비 평균 참여율</th></tr>
+{% for g in s.night.per_grade %}<tr><td>{{g.grade}}</td><td>{{g.avg}}</td><td>{{g.sum}}</td><td>{{g.male}}</td><td>{{g.female}}</td><td>{{g.rate}}%</td></tr>{% endfor %}
+<tr class="total"><td>합계</td><td>{{s.night.avg}}</td><td>{{s.night.sum}}</td><td colspan="3">실시 {{s.night.days}}일 · 최다 {{s.night.max_date}} ({{s.night.max}}명)</td></tr>
+</table>
+{% else %}<p>해당 기간 심야자습 자료 없음</p>{% endif %}
+
+<h2>7. 특이사항</h2>
+<table>
+<tr><th style="width:18%">일자</th><th style="width:12%">구분</th><th>내용</th></tr>
+{% for n in s.notes %}<tr><td>{{n.date}}</td><td>{{n.kind}}</td><td class="l">{{n.text}}</td></tr>
+{% else %}<tr><td colspan="3">해당 없음</td></tr>{% endfor %}
+</table>
+
+<h2>8. 분석 및 검토 의견</h2>
+<ul>{% for i in s.insights %}<li>{{i}}</li>{% endfor %}</ul>
+
+<div class="sign">{{today.replace('-', '. ')}}.<br>보고자: ______________ (인)</div>
+</div></body></html>

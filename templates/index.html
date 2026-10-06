@@ -1,0 +1,99 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>생활관 인원 통계</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:"Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;background:#f3f5f9;color:#222}
+header{background:#1d3256;color:#fff;padding:16px 24px}header h1{margin:0;font-size:20px}header p{margin:4px 0 0;font-size:13px;opacity:.8}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.card{background:#fff;border-radius:8px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:16px;color:#1d3256}
+.drop{border:2px dashed #8aa0c4;border-radius:8px;padding:22px;text-align:center;background:#f7f9fd;cursor:pointer}
+.drop.over{background:#e6edf8}.drop b{color:#2c4a7c}#picked{font-size:13px;color:#555;margin-top:8px}
+label{font-size:13px;font-weight:600;display:block;margin:8px 0 4px}
+input[type=date],input[type=text]{width:100%;padding:8px;border:1px solid #ccd;border-radius:5px;font-size:14px;font-family:inherit}
+.row{display:flex;gap:10px}.row>div{flex:1}
+.btn{display:inline-block;border:0;border-radius:5px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none}
+.btn-p{background:#2c4a7c;color:#fff}.btn-s{background:#e3e8f0;color:#1d3256}.btn-d{background:none;color:#b33;padding:4px 8px;font-size:12px}
+.btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.flash{padding:9px 12px;border-radius:5px;margin-bottom:6px;font-size:13px}
+.ok{background:#e8f6ec}.warn{background:#fff6dd}.error{background:#fde8e8}.info{background:#e8eef8}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:#f3f6fb;border-radius:6px;padding:10px;text-align:center}
+.stat .n{font-size:20px;font-weight:700;color:#2c4a7c}.stat .l{font-size:12px;color:#666}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #e3e6ec;padding:7px 6px;text-align:center}th{background:#eef2f8}
+.quick{font-size:12px;margin-top:6px}.quick a{margin-right:8px;color:#2c4a7c;cursor:pointer}
+.chk{font-weight:400;display:flex;align-items:center;gap:6px}
+.empty{color:#888;text-align:center;padding:30px}
+</style></head><body>
+<header><h1>📊 생활관 인원 누적 통계 · 결과보고서</h1><p>일일 인원 한글(.hwp) 파일을 올리면 자동으로 누적되고, 기간을 지정해 결과보고서를 만듭니다.</p></header>
+<main>
+{% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{cat}}">{{m}}</div>{% endfor %}{% endwith %}
+
+<div class="grid">
+ <div class="card">
+  <h2>① 일일 파일 업로드</h2>
+  <form action="/upload" method="post" enctype="multipart/form-data" id="upForm">
+   <div class="drop" id="drop" onclick="document.getElementById('files').click()">
+     📂 <b>클릭하거나 .hwp 파일들을 끌어다 놓으세요</b><br><small>여러 파일 한 번에 가능 · 같은 날짜는 새 파일로 교체됩니다</small>
+     <div id="picked"></div>
+   </div>
+   <input type="file" id="files" name="files" accept=".hwp" multiple hidden>
+   <div class="btns"><button class="btn btn-p" type="submit">업로드</button></div>
+  </form>
+  <p style="font-size:12px;color:#777;margin:10px 0 0">※ 날짜는 파일명 끝의 6자리(예: 261001 → 2026-10-01)로 인식합니다.</p>
+ </div>
+
+ <div class="card">
+  <h2>② 기간 결과보고서</h2>
+  <form action="/report" method="get" id="repForm">
+   <div class="row">
+    <div><label>시작일</label><input type="date" name="start" id="start" value="{{first}}" required></div>
+    <div><label>종료일</label><input type="date" name="end" id="end" value="{{last}}" required></div>
+   </div>
+   <div class="quick">빠른 선택: <a data-q="week">이번 주</a><a data-q="month">이번 달</a><a data-q="prev">지난달</a><a data-q="all">전체</a></div>
+   <label>보고서 제목</label><input type="text" name="title" value="생활관 인원 현황 결과보고">
+   <label class="chk"><input type="checkbox" name="mask" value="1"> 특이사항의 학생 이름 가리기 (김도연 → 김○연)</label>
+   <div class="btns">
+    <button class="btn btn-p" type="submit">📄 보고서 만들기</button>
+    <button class="btn btn-s" type="button" onclick="exportXlsx()">📥 엑셀로 받기</button>
+   </div>
+  </form>
+ </div>
+</div>
+
+{% if overall %}
+<div class="card">
+ <h2>누적 현황 ({{first}} ~ {{last}}, 자료 {{overall.summary.n}}일)</h2>
+ <div class="stats">
+  <div class="stat"><div class="n">{{overall.summary.avg_current}}명</div><div class="l">평균 현인원</div></div>
+  <div class="stat"><div class="n">{{overall.summary.avg_rate}}%</div><div class="l">평균 재사율</div></div>
+  <div class="stat"><div class="n">{{overall.summary.sum_home}}명</div><div class="l">누적 귀가(연인원)</div></div>
+  <div class="stat"><div class="n">{{overall.summary.sum_out}}명</div><div class="l">누적 외박(연인원)</div></div>
+ </div>
+</div>
+{% endif %}
+
+<div class="card">
+ <h2>업로드된 자료 ({{days|length}}일)</h2>
+ {% if days %}
+ <table><tr><th>일자</th><th>총원</th><th>현인원</th><th>재사율</th><th>귀가</th><th>외박</th><th>심야자습</th><th>특이사항</th><th>파일</th><th></th></tr>
+ {% for d in days %}<tr><td>{{d.date}}</td><td>{{d.total}}</td><td>{{d.current}}</td><td>{{d.rate}}%</td><td>{{d.home}}</td><td>{{d.out}}</td>
+ <td>{{'○' if d.has_night else '-'}}</td><td>{{d.notes or '-'}}</td><td style="font-size:11px;color:#777">{{d.filename}}</td>
+ <td><form action="/delete/{{d.date}}" method="post" onsubmit="return confirm('{{d.date}} 자료를 삭제할까요?')"><button class="btn btn-d">삭제</button></form></td></tr>{% endfor %}
+ </table>
+ {% else %}<div class="empty">아직 업로드된 자료가 없습니다. 위에서 일일 .hwp 파일을 올려 주세요.</div>{% endif %}
+</div>
+</main>
+<script>
+const inp=document.getElementById('files'),drop=document.getElementById('drop'),picked=document.getElementById('picked');
+function show(){picked.textContent=inp.files.length?inp.files.length+'개 선택됨: '+[...inp.files].map(f=>f.name).join(', '):''}
+inp.onchange=show;
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');inp.files=e.dataTransfer.files;show()};
+const fmt=d=>d.toLocaleDateString('sv-SE');
+document.querySelectorAll('.quick a').forEach(a=>a.onclick=()=>{const t=new Date(),s=document.getElementById('start'),e=document.getElementById('end');
+ if(a.dataset.q==='week'){const m=new Date(t);m.setDate(t.getDate()-((t.getDay()+6)%7));s.value=fmt(m);e.value=fmt(t)}
+ if(a.dataset.q==='month'){s.value=fmt(new Date(t.getFullYear(),t.getMonth(),1));e.value=fmt(t)}
+ if(a.dataset.q==='prev'){s.value=fmt(new Date(t.getFullYear(),t.getMonth()-1,1));e.value=fmt(new Date(t.getFullYear(),t.getMonth(),0))}
+ if(a.dataset.q==='all'){s.value='{{first}}';e.value='{{last}}'}});
+function exportXlsx(){location.href='/export?start='+document.getElementById('start').value+'&end='+document.getElementById('end').value}
+</script></body></html>
